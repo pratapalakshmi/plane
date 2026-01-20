@@ -1,0 +1,18 @@
+name: Deploy Branch on demand
+
+on:
+    # This workflow is only triggered by the `/build-deploy-preview` command dispatch
+    repository_dispatch:
+      types: [deploy-branch-command]
+
+jobs:
+  deploy-branch:
+    runs-on: ubuntu-latest
+    steps:
+      # This step creates a comment on the PR with a link to this workflow run.
+      - name: Add a comment on the PR with link to workflow run
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            type: ${{ github.event.client_payload.slash_command.args.named.type }}
