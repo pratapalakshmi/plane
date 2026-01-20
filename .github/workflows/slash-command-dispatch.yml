@@ -5,10 +5,16 @@ on:
 jobs:
   slashCommandDispatch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - name: Slash Command Dispatch
         uses: peter-evans/slash-command-dispatch@v5
         with:
           token: ${{ secrets.PAT }}
+          permission: write
+          issue-type: pull-request
           commands: |
             deploy-branch
