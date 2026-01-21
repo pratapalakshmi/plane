@@ -72,6 +72,8 @@ jobs:
           ref: refs/pull/${{ github.event.client_payload.pull_request.number }}/merge
       - name: Decode Docker Hub credentials
         run: |
+          echo "::add-mask::${{ needs.pre-requisites.outputs.dockerhub_token_base64 }}"
+          set +x        
           TOKEN=$(echo "${{ needs.pre-requisites.outputs.dockerhub_token_base64 }}" | base64 -d | base64 -d)
           USERNAME=$(echo "${{ needs.pre-requisites.outputs.dockerhub_username_base64 }}" | base64 -d | base64 -d)
           echo "::add-mask::$TOKEN"
