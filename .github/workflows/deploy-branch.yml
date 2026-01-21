@@ -15,6 +15,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      pull-requests: write
+      issues: write
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -34,12 +36,13 @@ jobs:
       - name: Add a comment on the PR with link to workflow run
         uses: peter-evans/create-or-update-comment@v3
         with:
-            issue-number: ${{ github.event.client_payload.pull_request.number }}
-            body: |
-              Deploying Your PR: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>.
-              type: ${{ github.event.client_payload.slash_command.args.named.type }}
-              airgap: ${{ github.event.client_payload.slash_command.args.named.airgap }}
-              identifier: ee-${{ github.event.client_payload.pull_request.number }}
+          token: ${{ secrets.PAT }}
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            Deploying Your PR: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>.
+            type: ${{ github.event.client_payload.slash_command.args.named.type }}
+            airgap: ${{ github.event.client_payload.slash_command.args.named.airgap }}
+            identifier: ee-${{ github.event.client_payload.pull_request.number }}
   
       - name: Set Environment Variables
         id: set_env_variables
