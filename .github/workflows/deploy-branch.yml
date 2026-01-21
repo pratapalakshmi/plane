@@ -1,9 +1,9 @@
-name: Deploy Branch on demand
+name: Deploy PR on demand
 
 on:
     # This workflow is only triggered by the `/build-deploy-preview` command dispatch
     repository_dispatch:
-      types: [deploy-branch-command]
+      types: [deploy-pr-command]
 
 jobs:
   deploy-branch:

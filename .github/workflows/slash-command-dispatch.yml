@@ -17,4 +17,4 @@ jobs:
           permission: write
           issue-type: pull-request
           commands: |
-            deploy-branch
+            deploy-pr
