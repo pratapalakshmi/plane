@@ -9,12 +9,30 @@ jobs:
   pre-requisites:
     runs-on: ubuntu-latest
     outputs:
+      dockerhub_username_base64: ${{ steps.dockerhub-secrets.outputs.dockerhub_username }}
+      dockerhub_token_base64: ${{ steps.dockerhub-secrets.outputs.dockerhub_token }}
       release_version: ${{ steps.set_env_variables.outputs.RELEASE_VERSION }}
     permissions:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Retrieve Docker Hub credentials from AWS Secrets Manager
+        id: dockerhub-secrets
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_NAME || 'github-actions/dockerhub' }} --query SecretString --output text)
+          DOCKERHUB_USERNAME=$(echo $SECRET_JSON | jq -r '.username')
+          DOCKERHUB_TOKEN=$(echo $SECRET_JSON | jq -r '.token')
+          echo "dockerhub_username=$(echo $DOCKERHUB_USERNAME | base64 -w0 | base64 -w0)" >> $GITHUB_OUTPUT
+          echo "dockerhub_token=$(echo $DOCKERHUB_TOKEN | base64 -w0 | base64 -w0)" >> $GITHUB_OUTPUT
+      
       - name: Add a comment on the PR with link to workflow run
         uses: peter-evans/create-or-update-comment@v3
         with:
@@ -43,31 +61,19 @@ jobs:
   branch_build_push_admin:
     name: Build-Push Admin Docker Image
     needs: [pre-requisites]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  
     permissions:
       id-token: write
       contents: read
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
-
-      - name: Retrieve Docker Hub credentials from AWS Secrets Manager
-        id: dockerhub-secrets
-        run: |
-          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_NAME || 'github-actions/dockerhub' }} --query SecretString --output text)
-          DOCKERHUB_USERNAME=$(echo $SECRET_JSON | jq -r '.username')
-          DOCKERHUB_TOKEN=$(echo $SECRET_JSON | jq -r '.token')
-          echo "dockerhub_username=$DOCKERHUB_USERNAME" >> $GITHUB_ENV
-          echo "dockerhub_token=$DOCKERHUB_TOKEN" >> $GITHUB_ENV
-          echo "::add-mask::$DOCKERHUB_TOKEN"
-      
+    steps:      
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           ref: refs/pull/${{ github.event.client_payload.pull_request.number }}/merge
+      - name: Decode Docker Hub credentials
+        run: |
+          echo "dockerhub_username=$(echo ${{ needs.pre-requisites.outputs.dockerhub_username_base64 }} | base64 -d | base64 -d)" >> $GITHUB_ENV
+          echo "dockerhub_token=$(echo ${{ needs.pre-requisites.outputs.dockerhub_token_base64 }} | base64 -d | base64 -d)" >> $GITHUB_ENV
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
