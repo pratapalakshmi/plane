@@ -15,4 +15,210 @@ jobs:
         with:
           issue-number: ${{ github.event.client_payload.pull_request.number }}
           body: |
+            Deploying Your PR: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>.
             type: ${{ github.event.client_payload.slash_command.args.named.type }}
+            airgap: ${{ github.event.client_payload.slash_command.args.named.airgap }}
+            identifier: ee-${{ github.event.client_payload.pull_request.number }}
+
+      - name: Checkout Code for Deploy
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.client_payload.pull_request.number }}/merge
+
+      - name: Set Environment Variables
+        run: |
+          echo "RELEASE_VERSION=ee-${{ github.event.client_payload.pull_request.number }}" >> $GITHUB_OUTPUT
+          echo "BUILDX_DRIVER=docker-container" >> $GITHUB_OUTPUT
+          echo "BUILDX_VERSION=latest" >> $GITHUB_OUTPUT
+          echo "BUILDX_PLATFORMS=linux/amd64" >> $GITHUB_OUTPUT
+          echo "BUILDX_ENDPOINT=" >> $GITHUB_OUTPUT
+
+      - name: Print PR number
+        run: |
+          echo "PR number: ${{ github.event.client_payload.pull_request.number }}"
+
+  branch_build_push_admin:
+    name: Build-Push Admin Docker Image
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Admin Build and Push
+        uses: makeplane/actions/build-push@v1.0.0
+        with:
+          release-version: ${{ env.RELEASE_VERSION }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          docker-image-owner: makeplane
+          docker-image-name: admin
+          build-context: .
+          dockerfile-path: ./apps/admin/Dockerfile.admin
+          buildx-driver: ${{ env.BUILDX_DRIVER }}
+          buildx-version: ${{ env.BUILDX_VERSION }}
+          buildx-platforms: ${{ env.BUILDX_PLATFORMS }} ## support for arm64 is coming soon
+          buildx-endpoint: ${{ env.BUILDX_ENDPOINT }}
+
+#   branch_build_push_web:
+#     name: Build-Push Web Docker Image
+#     runs-on: ubuntu-22.04
+#     needs: [branch_build_setup]
+#     steps:
+#       - name: Web Build and Push
+#         uses: makeplane/actions/build-push@v1.0.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ee-1${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_web }}
+#           build-context: .
+#           dockerfile-path: ./apps/web/Dockerfile.web
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+
+#   branch_build_push_space:
+#     name: Build-Push Space Docker Image
+#     runs-on: ubuntu-22.04
+#     needs: [branch_build_setup]
+#     steps:
+#       - name: Space Build and Push
+#         uses: makeplane/actions/build-push@v1.0.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_space }}
+#           build-context: .
+#           dockerfile-path: ./apps/space/Dockerfile.space
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+
+#   branch_build_push_live:
+#     name: Build-Push Live Collaboration Docker Image
+#     runs-on: ubuntu-22.04
+#     needs: [branch_build_setup]
+#     steps:
+#       - name: Live Build and Push
+#         uses: makeplane/actions/build-push@v1.0.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_live }}
+#           build-context: .
+#           dockerfile-path: ./apps/live/Dockerfile.live
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+
+#   branch_build_push_api:
+#     name: Build-Push API Server Docker Image
+#     runs-on: ubuntu-22.04
+#     needs: [branch_build_setup]
+#     steps:
+#       - name: Backend Build and Push
+#         uses: makeplane/actions/build-push@v1.0.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_backend }}
+#           build-context: ./apps/api
+#           dockerfile-path: ./apps/api/Dockerfile.api
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+
+#   branch_build_push_proxy:
+#     name: Build-Push Proxy Docker Image
+#     runs-on: ubuntu-22.04
+#     needs: [branch_build_setup]
+#     steps:
+#       - name: Proxy Build and Push
+#         uses: makeplane/actions/build-push@v1.0.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_proxy }}
+#           build-context: ./apps/proxy
+#           dockerfile-path: ./apps/proxy/Dockerfile.ce
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+
+#   branch_build_push_aio:
+#     if: ${{ needs.branch_build_setup.outputs.aio_build == 'true' }}
+#     name: Build-Push AIO Docker Image
+#     runs-on: ubuntu-22.04
+#     needs:
+#       - branch_build_setup
+#       - branch_build_push_admin
+#       - branch_build_push_web
+#       - branch_build_push_space
+#       - branch_build_push_live
+#       - branch_build_push_api
+#       - branch_build_push_proxy
+#     steps:
+#       - name: Checkout Files
+#         uses: actions/checkout@v4
+
+#       - name: Prepare AIO Assets
+#         id: prepare_aio_assets
+#         run: |
+#           cd deployments/aio/community
+
+#           if [ "${{ needs.branch_build_setup.outputs.build_type }}" == "Release" ]; then
+#             aio_version=${{ needs.branch_build_setup.outputs.release_version }}
+#           else
+#             aio_version=${{ needs.branch_build_setup.outputs.gh_branch_name }}
+#           fi
+#           bash ./build.sh --release $aio_version
+#           echo "AIO_BUILD_VERSION=${aio_version}" >> $GITHUB_OUTPUT
+
+#       - name: Upload AIO Assets
+#         uses: actions/upload-artifact@v4
+#         with:
+#           path: ./deployments/aio/community/dist
+#           name: aio-assets-dist
+
+#       - name: AIO Build and Push
+#         uses: makeplane/actions/build-push@v1.1.0
+#         with:
+#           build-release: ${{ needs.branch_build_setup.outputs.build_release }}
+#           build-prerelease: ${{ needs.branch_build_setup.outputs.build_prerelease }}
+#           release-version: ${{ needs.branch_build_setup.outputs.release_version }}
+#           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+#           docker-image-owner: makeplane
+#           docker-image-name: ${{ needs.branch_build_setup.outputs.dh_img_aio }}
+#           build-context: ./deployments/aio/community
+#           dockerfile-path: ./deployments/aio/community/Dockerfile
+#           buildx-driver: ${{ needs.branch_build_setup.outputs.gh_buildx_driver }}
+#           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
+#           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
+#           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+#           additional-assets: aio-assets-dist
+#           additional-assets-dir: ./deployments/aio/community/dist
+#           build-args: |
+#             PLANE_VERSION=${{ steps.prepare_aio_assets.outputs.AIO_BUILD_VERSION }}
+
