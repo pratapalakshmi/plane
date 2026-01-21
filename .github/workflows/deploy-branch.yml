@@ -30,6 +30,7 @@ jobs:
           SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_NAME || 'github-actions/dockerhub' }} --query SecretString --output text)
           DOCKERHUB_USERNAME=$(echo $SECRET_JSON | jq -r '.username')
           DOCKERHUB_TOKEN=$(echo $SECRET_JSON | jq -r '.token')
+          echo "::add-mask::$DOCKERHUB_TOKEN"
           echo "username=$DOCKERHUB_USERNAME" >> $GITHUB_OUTPUT
           echo "token=$DOCKERHUB_TOKEN" >> $GITHUB_OUTPUT      
 
