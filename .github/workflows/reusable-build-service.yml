@@ -1,0 +1,159 @@
+name: Reusable Build Service
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "Name of the service"
+        required: true
+        type: string
+      docker_image_name:
+        description: "Docker image name from setup outputs"
+        required: true
+        type: string
+      build_context:
+        description: "Build context path"
+        required: true
+        type: string
+      dockerfile_path:
+        description: "Path to Dockerfile"
+        required: true
+        type: string
+      build_release:
+        description: "Build release flag"
+        required: true
+        type: string
+      build_prerelease:
+        description: "Build prerelease flag"
+        required: true
+        type: string
+      release_version:
+        description: "Release version"
+        required: true
+        type: string
+      buildx_driver:
+        description: "Buildx driver"
+        required: true
+        type: string
+      buildx_version:
+        description: "Buildx version"
+        required: true
+        type: string
+      buildx_platforms:
+        description: "Buildx platforms"
+        required: true
+        type: string
+      buildx_endpoint:
+        description: "Buildx endpoint"
+        required: false
+        type: string
+        default: ""
+      private_registry_push:
+        description: "Push to private registry"
+        required: false
+        type: string
+        default: "false"
+      private_registry_username:
+        description: "Private registry username"
+        required: false
+        type: string
+      private_registry_token:
+        description: "Private registry token"
+        required: false
+        type: string
+      private_registry_addr:
+        description: "Private registry address"
+        required: false
+        type: string
+      private_registry_project:
+        description: "Private registry project"
+        required: false
+        type: string
+      build_args:
+        description: "Additional build args (multiline)"
+        required: false
+        type: string
+      generate_keypair:
+        description: "Generate keypair for monitor service"
+        required: false
+        type: boolean
+        default: false
+      target_branch:
+        description: "Target branch name"
+        required: false
+        type: string
+      default_private_key:
+        description: "Default private key for non-master branches"
+        required: false
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build_push_service:
+    name: Build-Push ${{ inputs.service_name }} Docker Image
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Files
+        uses: actions/checkout@v4
+
+      - name: Generate Keypair
+        if: inputs.generate_keypair == true
+        id: generate_keypair
+        run: |
+          if [ "${{ inputs.target_branch }}" == "master" ] || [ "${{ inputs.build_release }}" == "true" ]; then
+            openssl genrsa -out private_key.pem 2048
+          else
+            echo "${{ inputs.default_private_key }}" > private_key.pem
+          fi
+          openssl rsa -in private_key.pem -pubout -out public_key.pem
+          cat public_key.pem
+
+          # Generating the private key env for the generated keys
+          PRIVATE_KEY=$(cat private_key.pem | base64 -w 0)
+          echo "PRIVATE_KEY=${PRIVATE_KEY}" >> $GITHUB_ENV
+          echo "PRIVATE_KEY=${PRIVATE_KEY}" >> $GITHUB_OUTPUT
+
+      - name: Prepare Build Args
+        id: prepare_build_args
+        run: |
+          BUILD_ARGS_FILE=$(mktemp)
+          if [ -n "${{ inputs.build_args }}" ]; then
+            echo "${{ inputs.build_args }}" >> "$BUILD_ARGS_FILE"
+          fi
+          if [ "${{ inputs.generate_keypair }}" == "true" ] && [ -n "${{ env.PRIVATE_KEY }}" ]; then
+            echo "PRIVATE_KEY=${{ env.PRIVATE_KEY }}" >> "$BUILD_ARGS_FILE"
+          fi
+          if [ -s "$BUILD_ARGS_FILE" ]; then
+            cat "$BUILD_ARGS_FILE"
+            echo "build_args<<EOF" >> $GITHUB_OUTPUT
+            cat "$BUILD_ARGS_FILE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          rm -f "$BUILD_ARGS_FILE"
+
+      - name: ${{ inputs.service_name }} Build and Push
+        uses: makeplane/actions/build-push@v1.1.0
+        with:
+          build-release: ${{ inputs.build_release }}
+          build-prerelease: ${{ inputs.build_prerelease }}
+          release-version: ${{ inputs.release_version }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          private-registry-push: ${{ inputs.private_registry_push }}
+          private-registry-username: ${{ inputs.private_registry_username }}
+          private-registry-token: ${{ inputs.private_registry_token }}
+          private-registry-addr: ${{ inputs.private_registry_addr }}
+          private-registry-project: ${{ inputs.private_registry_project }}
+          docker-image-owner: makeplane
+          docker-image-name: ${{ inputs.docker_image_name }}
+          build-context: ${{ inputs.build_context }}
+          dockerfile-path: ${{ inputs.dockerfile_path }}
+          buildx-driver: ${{ inputs.buildx_driver }}
+          buildx-version: ${{ inputs.buildx_version }}
+          buildx-platforms: ${{ inputs.buildx_platforms }}
+          buildx-endpoint: ${{ inputs.buildx_endpoint }}
+          build-args: ${{ steps.prepare_build_args.outputs.build_args }}
