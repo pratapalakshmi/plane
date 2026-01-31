@@ -18,7 +18,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::426043895157:role/github-actions-eks-role-dev
+          role-to-assume: arn:aws:iam::426043895157:role/plane-github-actions-eks-role-dev
           aws-region: us-east-1
 
       - name: Update kubeconfig
@@ -30,3 +30,17 @@ jobs:
       - name: Verify access
         run: |
           kubectl get nodes
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::426043895157:role/plane-github-actions-secrets-role-dev
+          aws-region: us-east-1
+
+      - name: Retrieve deploy secrets from AWS Secrets Manager
+        id: deploy-secrets
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_NAME || 'github-actions/github-actions-secrets' }} --query SecretString --output text)
+          CLOUDFLARE_TOKEN=$(echo $SECRET_JSON | jq -r '.cloudflare_api_token')
+          echo "cloudflare_token=$CLOUDFLARE_TOKEN" >> $GITHUB_ENV
+          echo "::add-mask::$CLOUDFLARE_TOKEN"          
